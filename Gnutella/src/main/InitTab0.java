@@ -48,6 +48,7 @@ public class InitTab0 {
 					if (list.getSelectedValue() != null) {
 						mf.selectedUsername = list.getSelectedValue().toString();
 						getUser(mf);
+						mf.tabbedPane.setEnabledAt(1, true);
 						mf.tabbedPane.setSelectedIndex(1);
 					}
 				}

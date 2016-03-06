@@ -111,6 +111,8 @@ public class MainFrame extends JFrame {
 		tabbedPane.addTab("Connection", null, panel, null);
 		tabbedPane.addTab("Mode", null, panel_1, null);
 
+		tabbedPane.setEnabledAt(1, false);
+		
 		writeMyFile();
 		readUsers();
 

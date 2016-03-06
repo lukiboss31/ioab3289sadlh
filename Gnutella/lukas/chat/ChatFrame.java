@@ -1,4 +1,4 @@
-package schoolcomm;
+package chat;
 
 import java.awt.Color;
 import java.awt.EventQueue;
@@ -18,7 +18,10 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.border.EmptyBorder;
 
-public class ComFrame extends JFrame {
+import data.User;
+import schoolcomm.ComWriter;
+
+public class ChatFrame extends JFrame {
 
 	/**
 	 * 
@@ -48,7 +51,7 @@ public class ComFrame extends JFrame {
 					User u = new User();
 					u.remotePort = remotePort;
 					u.port = myPort;
-					ComFrame frame = new ComFrame(u);
+					ChatFrame frame = new ChatFrame(u);
 					frame.setVisible(true);
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -63,7 +66,7 @@ public class ComFrame extends JFrame {
 	 * @throws IOException
 	 */
 
-	public ComFrame(User user) throws IOException {
+	public ChatFrame(User user) throws IOException {
 
 		if (user.hostName == null) {
 			InetAddress addr = InetAddress.getLocalHost();
@@ -148,7 +151,7 @@ public class ComFrame extends JFrame {
 			comWriter = new ComWriter(hostName, remotePort);
 			// comWriter.send("test!!!");
 
-			comWriter.send(newLine);
+			comWriter.send("ch", newLine);
 		} catch (Exception e) {
 			setText("error: " + e.getMessage());
 		}
@@ -156,7 +159,7 @@ public class ComFrame extends JFrame {
 
 	}
 
-	void setText(String newLine) {
+	public void setText(String newLine) {
 		String text = textArea.getText();
 
 		text = text + "\n" + newLine;

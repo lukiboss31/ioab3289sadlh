@@ -1,4 +1,4 @@
-package schoolcomm;
+package data;
 
 
 public class User {

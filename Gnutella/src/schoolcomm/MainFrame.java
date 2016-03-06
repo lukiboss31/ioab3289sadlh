@@ -8,13 +8,14 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.FilenameFilter;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -27,22 +28,33 @@ import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JTabbedPane;
 import javax.swing.border.EmptyBorder;
+
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+
+import chat.ChatFrame;
+import data.User;
+import data.sqliteConnection;
+import main.InitTab0;
 
 public class MainFrame extends JFrame {
 
 	private static final long serialVersionUID = -5258975096863902697L;
 	private JPanel contentPane;
-	private List<User> users = new ArrayList<User>();
-	private Map<String, ComFrame> frames = new HashMap<String, ComFrame>();
-	private final JList<String> list = new JList<String>();
+	public List<User> users = new ArrayList<User>();
+	private Map<String, ChatFrame> frames = new HashMap<String, ChatFrame>();
+	public final JList<String> list = new JList<String>();
 	private DefaultListModel<String> model;
-	private ComListener server;
-	private User self = new User();
+	private ComListener listener;
+	public User self = new User();
+	public String selectedUsername;
+	public Connection connection = null;
+	public JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
+	public User selectedUser;
 
-	/**
-	 * Launch the application.
-	 */
 	public static void main(String[] args) {
 		final int myPort = (args.length > 0) ? Integer.parseInt(args[0]) : 5555;
 		final String myUsername = (args.length > 1) ? args[1] : System.getProperty("user.name");
@@ -58,17 +70,70 @@ public class MainFrame extends JFrame {
 		});
 	}
 
-	/**
-	 * Create the frame.
-	 */
 	public MainFrame(int myPort, String myUsername) {
 
-		self.port = myPort;
-		self.username = myUsername;
+		initSelf(myPort, myUsername);
 
-		server = new ComListener(self.port, this);
-		server.start();
+		listener = new ComListener(self.port, this);
+		listener.start();
+		connection = sqliteConnection.dbConnection();
 
+		initMainFrame();
+
+		GridBagConstraints gbc_tabbedPane = new GridBagConstraints();
+		gbc_tabbedPane.insets = new Insets(0, 0, 5, 5);
+		gbc_tabbedPane.fill = GridBagConstraints.BOTH;
+		gbc_tabbedPane.gridx = 1;
+		gbc_tabbedPane.gridy = 1;
+		contentPane.add(tabbedPane, gbc_tabbedPane);
+
+		JPanel panel = InitTab0.InitTab0(this);
+
+		JPanel panel_1 = new JPanel();
+		GridBagLayout gbl_panel_1 = new GridBagLayout();
+		gbl_panel_1.columnWidths = new int[] { 0, 0, 0 };
+		gbl_panel_1.rowHeights = new int[] { 0, 0, 0 };
+		gbl_panel_1.columnWeights = new double[] { 0.0, 0.0, Double.MIN_VALUE };
+		gbl_panel_1.rowWeights = new double[] { 0.0, 0.0, Double.MIN_VALUE };
+		panel_1.setLayout(gbl_panel_1);
+
+		JButton btnChat = new JButton("chat");
+		btnChat.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				getOrCreateFrameForUsername(selectedUsername);
+			}
+		});
+		GridBagConstraints gbc_btnChat = new GridBagConstraints();
+		gbc_btnChat.gridx = 1;
+		gbc_btnChat.gridy = 1;
+		panel_1.add(btnChat, gbc_btnChat);
+
+		tabbedPane.addTab("Connection", null, panel, null);
+		tabbedPane.addTab("Mode", null, panel_1, null);
+
+		writeMyFile();
+		readUsers();
+
+		addWindowListener(new WindowAdapter() {
+			@Override
+			public void windowClosing(WindowEvent e) {
+				try {
+					System.out.println("closing");
+					String querry = "delete from users where \"ip-Addr\"='" + self.ipAddr + "' and username='"
+							+ self.username + "'";
+					PreparedStatement pst = connection.prepareStatement(querry);
+					pst.execute();
+					pst.close();
+
+				} catch (Exception e1) {
+					e1.printStackTrace();
+				}
+				System.exit(0);
+			}
+		});
+	}
+
+	private void initMainFrame() {
 		setTitle(self.username + ": " + self.port);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setBounds(100, 100, 450, 450);
@@ -77,47 +142,24 @@ public class MainFrame extends JFrame {
 		setContentPane(contentPane);
 		GridBagLayout gbl_contentPane = new GridBagLayout();
 		gbl_contentPane.columnWidths = new int[] { 0, 0, 0, 0 };
-		gbl_contentPane.rowHeights = new int[] { 0, 0, 0, 0, 0, 0 };
+		gbl_contentPane.rowHeights = new int[] { 0, 0, 0, 0 };
 		gbl_contentPane.columnWeights = new double[] { 0.0, 1.0, 0.0, Double.MIN_VALUE };
-		gbl_contentPane.rowWeights = new double[] { 0.0, 1.0, 0.0, 0.0, 0.0, Double.MIN_VALUE };
+		gbl_contentPane.rowWeights = new double[] { 0.0, 1.0, 0.0, Double.MIN_VALUE };
 		contentPane.setLayout(gbl_contentPane);
-		list.addMouseListener(new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent event) {
-				if (event.getClickCount() == 2) {
+	}
 
-					if (list.getSelectedValue() != null) {
-						String selectedUsername = list.getSelectedValue().toString();
-						// open chat with user
-						getOrCreateFrameForUsername(selectedUsername);
-					}
-				}
-			}
-		});
+	private void initSelf(int myPort, String myUsername) {
+		InetAddress addr = null;
+		try {
+			addr = InetAddress.getLocalHost();
+		} catch (UnknownHostException e2) {
+			e2.printStackTrace();
+		}
 
-		GridBagConstraints gbc_list = new GridBagConstraints();
-		gbc_list.insets = new Insets(0, 0, 5, 5);
-		gbc_list.fill = GridBagConstraints.BOTH;
-		gbc_list.gridx = 1;
-		gbc_list.gridy = 1;
-		contentPane.add(list, gbc_list);
-
-		JButton btnRefresh = new JButton("Refresh");
-		btnRefresh.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				refreshList();
-			}
-		});
-		GridBagConstraints gbc_btnRefresh = new GridBagConstraints();
-		gbc_btnRefresh.fill = GridBagConstraints.HORIZONTAL;
-		gbc_btnRefresh.insets = new Insets(0, 0, 5, 5);
-		gbc_btnRefresh.gridx = 1;
-		gbc_btnRefresh.gridy = 3;
-		contentPane.add(btnRefresh, gbc_btnRefresh);
-
-		writeMyFile();
-		readUsers();
-
+		self.port = myPort;
+		self.username = myUsername;
+		self.hostName = addr.getHostName();
+		self.ipAddr = addr.getHostAddress();
 	}
 
 	private User findUser(String gesuchteUsername) {
@@ -132,29 +174,28 @@ public class MainFrame extends JFrame {
 
 	public void readUsers() {
 		users.clear();
-		File dir = new File("config");
+		try {
+			String querry = "select * from users";
+			PreparedStatement pst = connection.prepareStatement(querry);
+			ResultSet rs = pst.executeQuery();
+			while (rs.next()) {
 
-		if (!dir.exists() || !dir.isDirectory()) {
-			throw new IllegalStateException("Config does not exists!");
-		}
-		String[] list = dir.list(new FilenameFilter() {
+				User u = new User();
+				u.hostName = rs.getString("hostname");
+				u.ipAddr = rs.getString("ip-Addr");
+				u.remotePort = rs.getInt("port");
+				u.username = rs.getString("username");
+				System.out.println(u);
 
-			@Override
-			public boolean accept(File dir, String fileName) {
-				if (fileName.endsWith(".txt")) {
-					return true;
+				if (u != null && !u.username.equals(self.username)) {
+					users.add(u);
 				}
-				return false;
-			}
-		});
-
-		for (String filename : list) {
-			User u = readUser(filename);
-
-			if (u != null && !u.username.equals(self.username)) {
-				users.add(u);
 			}
 
+			rs.close();
+			pst.close();
+		} catch (Exception e1) {
+			e1.printStackTrace();
 		}
 
 		// sort:
@@ -168,45 +209,8 @@ public class MainFrame extends JFrame {
 
 	}
 
-	private User readUser(String filename) {
-
-		// System.out.println(filename);
-		File f = new File("config", filename);
-
-		try {
-			BufferedReader r = new BufferedReader(new FileReader(f));
-
-			String readLine = r.readLine();
-			r.close();
-
-			// System.out.println("line = " + readLine);
-
-			String[] split = readLine.split(":");
-
-			// System.out.println("Split : " + split[0]);
-
-			User u = new User();
-
-			u.hostName = split[0];
-			u.ipAddr = split[1];
-			u.remotePort = Integer.parseInt(split[2]);
-			u.username = filename.split(".txt")[0];
-			System.out.println(u);
-			return u;
-
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		return null;
-	}
-
 	public void refreshList() {
-		// 1: read users
 		readUsers();
-		// refreshed list of users is in users.
-
-		// 2: add users to JList
 		model = new DefaultListModel<String>();
 
 		for (User u : users) {
@@ -218,47 +222,46 @@ public class MainFrame extends JFrame {
 
 	public void writeMyFile() {
 		try {
-			InetAddress addr = InetAddress.getLocalHost();
-			String ipAddr = addr.getHostAddress();
-			String hostName = addr.getHostName();
 
-			File config = new File("config");
-			if (!config.exists()) {
-				config.mkdir();
-			}
-			File file = new File("config", self.username + ".txt");
-			boolean firstTime = !file.exists();
-			FileWriter wri = null;
+			String querry = "INSERT INTO users (hostname, \"ip-Addr\", port, username) VALUES (?, ?, ?, ?);";
+			PreparedStatement pst = connection.prepareStatement(querry);
+			pst.setString(1, self.hostName);
+			pst.setString(2, self.ipAddr);
+			pst.setInt(3, self.port);
+			pst.setString(4, self.username);
 
-			wri = new FileWriter(file, true);
-			if (firstTime) {
-				wri.write(hostName + ":" + ipAddr + ":" + self.port);
-			}
-			file.deleteOnExit();
-
-			if (wri != null) {
-
-				wri.close();
-			}
-
-		} catch (IOException ignore) {
-			System.out.println(ignore);
+			pst.execute();
+		} catch (Exception e1) {
+			e1.printStackTrace();
 		}
-
 	}
 
 	public void messageReceived(String text) {
-		// text = "ocko: blabla"
 
-		// username = "ocko"
-		String username = getUsername(text);
+		JSONParser parser = new JSONParser();
+		String key = "";
+		String msg = "";
+		try {
+			Object parsed = parser.parse(text);
+			JSONObject obj = (JSONObject) parsed;
 
-		ComFrame commFrame = getOrCreateFrameForUsername(username);
-		commFrame.setText(text);
+			key = "" + obj.get("key");
+			msg = "" + obj.get("msg");
+
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+
+		if (key == "ch") {
+			String username = getUsername(msg);
+
+			ChatFrame commFrame = getOrCreateFrameForUsername(username);
+			commFrame.setText(msg);
+		}
 	}
 
-	private ComFrame getOrCreateFrameForUsername(String username) {
-		ComFrame commFrame = frames.get(username);
+	private ChatFrame getOrCreateFrameForUsername(String username) {
+		ChatFrame commFrame = frames.get(username);
 
 		if (commFrame == null) {
 			User user = findUserWithRefresh(username);
@@ -282,10 +285,10 @@ public class MainFrame extends JFrame {
 		return user;
 	}
 
-	private ComFrame createComFrame(User user) {
-		ComFrame commFrame = null;
+	private ChatFrame createComFrame(User user) {
+		ChatFrame commFrame = null;
 		try {
-			commFrame = new ComFrame(user);
+			commFrame = new ChatFrame(user);
 			commFrame.setVisible(true);
 			commFrame.toFront();
 			frames.put(user.username, commFrame);

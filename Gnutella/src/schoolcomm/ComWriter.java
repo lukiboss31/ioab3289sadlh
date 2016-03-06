@@ -5,6 +5,8 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
+import org.json.simple.JSONObject;
+
 public class ComWriter {
 
 	private Socket echoSocket;
@@ -16,9 +18,11 @@ public class ComWriter {
 		out = new PrintWriter(echoSocket.getOutputStream(), true);
 	}
 
-	public void send(String text) {
-		out.println(text);
-
+	public void send(String key, String text) {
+		JSONObject obj = new JSONObject();
+		obj.put("key", key);
+		obj.put("msg", text);
+		out.println(obj);
 	}
 
 	public void close() {

@@ -18,6 +18,7 @@ public class ComWriter {
 		out = new PrintWriter(echoSocket.getOutputStream(), true);
 	}
 
+	@SuppressWarnings("unchecked")
 	public void send(String key, String text) {
 		JSONObject obj = new JSONObject();
 		obj.put("key", key);

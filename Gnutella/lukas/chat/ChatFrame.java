@@ -37,7 +37,6 @@ public class ChatFrame extends JFrame {
 	private String hostName;
 	private int remotePort;
 	private String ipAddr;
-
 	/**
 	 * Launch the application.
 	 */
@@ -75,7 +74,9 @@ public class ChatFrame extends JFrame {
 			user.username = System.getProperty("user.name");
 			user.hostName = addr.getHostName();
 		}
+		this.ipAddr = user.ipAddr;
 		this.remotePort = user.remotePort;
+		this.hostName = user.hostName;
 		setTitle("Chating to " + user.username + " on host: " + user.hostName);
 
 		setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);

@@ -302,7 +302,6 @@ public class MainFrame extends JFrame {
 	}
 
 	public String getUsername(String text) {
-		// "ocko: blabla"
 		String[] split = text.split(":");
 		String username = split[0];
 		return username;

@@ -23,10 +23,10 @@ public class InitTab0 {
 
 	private static String selectedUsername;
 
-	public static JPanel InitTab0(MainFrame mf) {
+	public static JPanel InitTab0(final MainFrame mf) {
 		
 		
-		JList<String> list = mf.list;
+		final JList<String> list = mf.list;
 		JPanel panel = new JPanel();
 		GridBagLayout gbl_panel = new GridBagLayout();
 		gbl_panel.columnWidths = new int[] { 0, 177, 0, 0 };
